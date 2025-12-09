@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Frontier of Ash</title>
+<style>
+body {
+    background-color: #0d0d0d;
+    color: #e5e5e5;
+    font-family: monospace;
+    padding: 20px;
+}
+button {
+    background: #1a1a1a;
+    color: #e5e5e5;
+    border: 1px solid #555;
+    padding: 10px;
+    margin: 5px;
+    cursor: pointer;
+}
+button:hover {
+    background: #333;
+}
+#game-box {
+    border: 1px solid #333;
+    padding: 20px;
+    background: #111;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Frontier of Ash</h1>
+
+<div id="music-controls">
+    <button id="toggleMusic">🔊 Music: On</button>
+</div>
+
+<div id="stats">
+    <b>HP:</b> <span id="hp">100</span>  
+    &nbsp;&nbsp;  
+    <b>Ammo:</b> <span id="ammo">12</span>  
+</div>
+
+<hr>
+
+<div id="game-box"></div>
+
+<!-- MUSIC -->
+<audio id="bgMusic" loop>
+    <source src="01-Metallic Monks.mp3" type="audio/mpeg">
+</audio>
+
+<script>
+const music = document.getElementById("bgMusic");
+const toggle = document.getElementById("toggleMusic");
+
+let musicOn = true;
+
+window.addEventListener("load", () => {
+    music.volume = 0.45;
+    music.play().catch(() => {
+        toggle.textContent = "🔈 Click to Enable Music";
+    });
+});
+
+toggle.addEventListener("click", () => {
+    if (musicOn) {
+        music.pause();
+        toggle.textContent = "🔈 Music: Off";
+        musicOn = false;
+    } else {
+        music.play();
+        toggle.textContent = "🔊 Music: On";
+        musicOn = true;
+    }
+});
+
+// GAME STATE
+let hp = 100;
+let ammo = 12;
+
+function updateStats() {
+    document.getElementById("hp").textContent = hp;
+    document.getElementById("ammo").textContent = ammo;
+}
+
+// WRITE TO SCREEN
+function show(text, options=[]) {
+    const box = document.getElementById("game-box");
+    box.innerHTML = `<p>${text}</p>`;
+
+    options.forEach(o => {
+        const btn = document.createElement("button");
+        btn.textContent = o.text;
+        btn.onclick = o.action;
+        box.appendChild(btn);
+    });
+}
+
+// START OF GAME
+function start() {
+    show(`
+        The year is 2189.  
+        The United American Provisional Government — “the Remnants” —  
+        controls everything east of the Wasatch mountains.
+
+        West of the peaks lies the **Free Tribes of the West**  
+        — fractured clans, half-civilized, half-feral,  
+        living among ruins no map dares show.
+
+        You are a Remnant courier sent to negotiate  
+        the first trade route in sixty years.
+
+        The pass grows colder. Something alive watches you.
+    `, [
+        { text: "Enter the mountain pass", action: scene_pass }
+    ]);
+}
+
+function scene_pass() {
+    show(`
+        The wind turns metallic.  
+        Shapes move in the fog — wrong shapes.  
+        A silhouette lurches forward, twitching like meat pulled by strings.
+
+        A Free Tribes raider, or what's left of one.
+    `, [
+        { text: "Prepare to fight", action: () => combat("Twisted Tribesman") }
+    ]);
+}
+
+// COMBAT SYSTEM (VATS-STYLE)
+function combat(enemyName) {
+
+    let enemy = {
+        name: enemyName,
+        hp: 50,
+        parts: {
+            head: { dmg: 30, hit: 0.35 },
+            torso: { dmg: 20, hit: 0.75 },
+            legs: { dmg: 15, hit: 0.55 }
+        }
+    };
+
+    function combatRound() {
+        updateStats();
+
+        if (enemy.hp <= 0) {
+            return show(`${enemy.name} collapses unnaturally, like a puppet whose strings were cut.`, [
+                { text: "Continue", action: scene_afterCombat }
+            ]);
+        }
+
+        if (hp <= 0) {
+            return show("You collapse. The mountains claim another traveler.", [
+                { text: "Restart", action: start }
+            ]);
+        }
+
+        let body = `
+            <b>${enemy.name}</b><br>
+            Enemy HP: ${enemy.hp}<br><br>
+            Choose where to shoot:
+        `;
+
+        show(body, [
+            { text: "Head (Low Hit / High Damage)", action: () => shoot("head") },
+            { text: "Torso (High Hit / Medium Damage)", action: () => shoot("torso") },
+            { text: "Legs (Medium Hit / Low Damage)", action: () => shoot("legs") }
+        ]);
+    }
+
+    function shoot(part) {
+
+        if (ammo <= 0) {
+            return show("You pull the trigger — click. Empty.", [
+                { text: "Die horribly", action: () => { hp = 0; combatRound(); } }
+            ]);
+        }
+
+        ammo--;
+        updateStats();
+
+        let data = enemy.parts[part];
+        let hitRoll = Math.random();
+
+        let text = "";
+
+        if (hitRoll <= data.hit) {
+            enemy.hp -= data.dmg;
+            text += `You hit the ${enemy.name}'s ${part}, dealing ${data.dmg} damage.<br>`;
+        } else {
+            text += `You miss the ${enemy.name}'s ${part}.<br>`;
+        }
+
+        // Enemy attacks back
+        let enemyHit = Math.random() < 0.6;
+        if (enemyHit) {
+            let dmg = Math.floor(Math.random() * 10) + 5;
+            hp -= dmg;
+            text += `<br>The ${enemy.name} slashes you for ${dmg} damage.`;
+        } else {
+            text += `<br>The ${enemy.name} misses you.`;
+        }
+
+        show(text, [
+            { text: "Continue", action: combatRound }
+        ]);
+    }
+
+    combatRound();
+}
+
+function scene_afterCombat() {
+    show(`
+        The corpse twitches long after death.  
+        The Free Tribes always whispered that  
+        “the mountains remember their dead.”
+
+        And now you believe them.
+
+        Ahead lies the border town of **Ashpoint**,  
+        first Remnant settlement in Tribal land.
+    `, [
+        { text: "Walk to Ashpoint", action: scene_ashpoint }
+    ]);
+}
+
+function scene_ashpoint() {
+    show(`
+        Ashpoint is half frontier town, half refugee camp.  
+        Firelight flickers against crude wooden gates.  
+        Children stare at you — their eyes reflecting light wrong.
+
+        The Remnant flag hangs beside the banner of the Free Tribes.  
+        A fragile peace.
+
+        Someone whispers behind you:  
+        “Courier… do you hear it too?”
+    `, [
+        { text: "Turn around", action: scene_mystery },
+        { text: "Ignore and enter town", action: scene_town }
+    ]);
+}
+
+function scene_mystery() {
+    show(`
+        A Tribal elder stands behind you, face painted white with ash.  
+        “The mountains marked you,” she says.  
+        “You brought something back.”
+
+        Her pupils dilate into perfect circles. Too perfect.
+    `, [
+        { text: "Ask what she means", action: () => show("“You'll know soon.”", [{text:"Continue", action: scene_town}]) }
+    ]);
+}
+
+function scene_town() {
+    show(`
+        Inside Ashpoint, the Remnants prepare for expansion,  
+        while the Free Tribes mutter about the old spirits stirring.
+
+        Something is deeply wrong here.  
+        The frontier was supposed to bring civilization.  
+        Instead, it brought something else awake.
+    `, [
+        { text: "To be continued…", action: start }
+    ]);
+}
+
+start();
+</script>
+
+</body>
+</html>
